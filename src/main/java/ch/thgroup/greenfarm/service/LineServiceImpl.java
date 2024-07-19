@@ -1,4 +1,4 @@
-package com.thgroup.greenfarm;
+package ch.thgroup.greenfarm.service;
 
 import org.json.JSONArray;
 import org.json.JSONObject;

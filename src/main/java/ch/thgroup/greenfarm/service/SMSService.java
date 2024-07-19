@@ -1,4 +1,4 @@
-package com.thgroup.greenfarm;
+package ch.thgroup.greenfarm.service;
 
 import java.io.IOException;
 import java.net.URISyntaxException;

@@ -1,5 +1,6 @@
-package com.thgroup.greenfarm;
+package ch.thgroup.greenfarm.controller;
 
+import ch.thgroup.greenfarm.service.SMSService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;

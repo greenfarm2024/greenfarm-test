@@ -1,6 +1,7 @@
-package com.thgroup.greenfarm;
+package ch.thgroup.greenfarm.service;
 
 import org.json.JSONObject;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -14,9 +15,13 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
 @Service
+@Profile("!dev")  // This will be active in all profiles except "dev"
 public class SMSServiceImpl implements SMSService {
 
     private static final String SMS_API_URL = "https://api.send-sms.in.th/api/v2/SendSMS";
+
+//    private static final String SMS_API_URL = "https://7675e329-e578-41de-87b3-3cff863dc552.mock.pstmn.io/yyy";
+
     private static final String USERNAME = "thgroup";
     private static final String PASSWORD = "ZPyq9urQxm!dvKtEx";
     private static final String API_KEY = "6mp8i/CWGzMSrSono5w/voqSMNnOF4RdZU9xOBo2mUw=";
