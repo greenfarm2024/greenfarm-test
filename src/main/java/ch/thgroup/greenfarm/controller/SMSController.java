@@ -2,13 +2,12 @@ package ch.thgroup.greenfarm.controller;
 
 import ch.thgroup.greenfarm.service.SMSService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/sms")
@@ -38,6 +37,16 @@ public class SMSController {
         } catch (IOException | InterruptedException | URISyntaxException e) {
             e.printStackTrace();
             return "Failed to send SMS via POST";
+        }
+    }
+
+    @GetMapping("/status")
+    public ResponseEntity<String> getMessageStatus(@RequestParam UUID messageId) {
+        try {
+            String response = smsService.getMessageStatus(messageId);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(e.getMessage());
         }
     }
 }

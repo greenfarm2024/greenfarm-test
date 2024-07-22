@@ -3,6 +3,10 @@ package ch.thgroup.greenfarm.service;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
+import java.net.URISyntaxException;
+import java.util.UUID;
+
 @Service
 @Profile("dev")  // This will only be active in the "dev" profile
 public class MockSMSServiceImpl implements SMSService {
@@ -45,5 +49,25 @@ public class MockSMSServiceImpl implements SMSService {
             ]
         }
         """;
+    }
+
+    @Override
+    public String getMessageStatus(UUID messageId) throws IOException, InterruptedException, URISyntaxException {
+        return """
+    {
+        "ErrorCode": 0,
+        "ErrorDescription": "Success",
+        "Data": {
+            "MobileNumber": "66996946359",
+            "SenderId": "MAILBITTEST",
+            "Message": "XXX!",
+            "SubmitDate": "17 Jul 2024 22:11:38",
+            "DoneDate": "17 Jul 2024 22:11:00",
+            "MessageId": "bd788c4e-a6cb-46cf-855a-40f4788509ae",
+            "Status": "DELIVRD",
+            "ErrorCode": "000"
+        }
+    }
+    """;
     }
 }
