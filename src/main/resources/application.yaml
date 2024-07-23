@@ -13,3 +13,9 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: update
+
+checkMessageStatus:
+  schedule: "0 0/1 * * * ?"  # Runs every minute
+  maxRuns: 3                 # Maximum number of runs
+
+

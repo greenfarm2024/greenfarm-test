@@ -4,13 +4,17 @@ import ch.thgroup.greenfarm.model.CheckSMSEntity;
 import ch.thgroup.greenfarm.model.SendSMSEntity;
 import ch.thgroup.greenfarm.repository.CheckSMSRepository;
 import ch.thgroup.greenfarm.repository.SendSMSRepository;
+import ch.thgroup.greenfarm.service.config.ScheduleConfig;
 import ch.thgroup.greenfarm.service.dto.CheckSMSDTO;
 import ch.thgroup.greenfarm.service.dto.SendSMSDTO;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpMethod;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -43,19 +47,25 @@ public class SMSServiceImpl implements SMSService {
     private static final String MOBILE_NUMBERS = "66996946359";
     private static final String IS_UNICODE = "true";
     private static final String IS_FLASH = "true";
-    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm:ss");
+
 
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
     private final SendSMSRepository sendSMSRepository;
     private final CheckSMSRepository checkSMSRepository;
 
+    private final ScheduleConfig scheduleConfig;
+    private int counter = 0;
+
     @Autowired
-    public SMSServiceImpl(ObjectMapper objectMapper, SendSMSRepository sendSMSRepository, CheckSMSRepository checkSMSRepository) {
+    public SMSServiceImpl(ObjectMapper objectMapper, SendSMSRepository sendSMSRepository,
+                          CheckSMSRepository checkSMSRepository, ScheduleConfig scheduleConfig) {
         this.httpClient = HttpClient.newHttpClient();
         this.objectMapper = objectMapper;
         this.sendSMSRepository = sendSMSRepository;
         this.checkSMSRepository = checkSMSRepository;
+        this.scheduleConfig = scheduleConfig;
     }
 
     @Override
@@ -81,6 +91,18 @@ public class SMSServiceImpl implements SMSService {
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
         saveSendSMSData(response.body());
         return response.body();
+    }
+
+    @Scheduled(cron = "#{scheduleConfig.getSchedule()}")
+    public void scheduleGetMessageStatus() {
+        if (counter < scheduleConfig.getMaxRuns()) {
+            try {
+                getMessageStatus(stringToUUID("23fabad8-2a16-4699-8847-17f9a9642c53"));
+                counter++;
+            } catch (IOException | InterruptedException | URISyntaxException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     @Override
