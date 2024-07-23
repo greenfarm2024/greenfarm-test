@@ -1,17 +1,14 @@
 package ch.thgroup.greenfarm.service;
 
-import ch.thgroup.greenfarm.model.CheckSMSEntity;
-import ch.thgroup.greenfarm.model.SendSMSEntity;
-import ch.thgroup.greenfarm.repository.CheckSMSRepository;
-import ch.thgroup.greenfarm.repository.SendSMSRepository;
+import ch.thgroup.greenfarm.model.SMSEntity;
+import ch.thgroup.greenfarm.repository.SMSRepository;
 import ch.thgroup.greenfarm.service.config.ScheduleConfig;
 import ch.thgroup.greenfarm.service.dto.CheckSMSDTO;
 import ch.thgroup.greenfarm.service.dto.SendSMSDTO;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpMethod;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -29,9 +26,11 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.Base64;
+import java.util.List;
 import java.util.UUID;
 import java.net.URLEncoder;
 
+@Slf4j
 @Service
 @Profile("!dev")  // This will be active in all profiles except "dev"
 public class SMSServiceImpl implements SMSService {
@@ -52,19 +51,16 @@ public class SMSServiceImpl implements SMSService {
 
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
-    private final SendSMSRepository sendSMSRepository;
-    private final CheckSMSRepository checkSMSRepository;
+    private final SMSRepository smsRepository;
 
     private final ScheduleConfig scheduleConfig;
-    private int counter = 0;
 
     @Autowired
-    public SMSServiceImpl(ObjectMapper objectMapper, SendSMSRepository sendSMSRepository,
-                          CheckSMSRepository checkSMSRepository, ScheduleConfig scheduleConfig) {
+    public SMSServiceImpl(ObjectMapper objectMapper, SMSRepository smsRepository,
+                          ScheduleConfig scheduleConfig) {
         this.httpClient = HttpClient.newHttpClient();
         this.objectMapper = objectMapper;
-        this.sendSMSRepository = sendSMSRepository;
-        this.checkSMSRepository = checkSMSRepository;
+        this.smsRepository = smsRepository;
         this.scheduleConfig = scheduleConfig;
     }
 
@@ -72,7 +68,7 @@ public class SMSServiceImpl implements SMSService {
     public String sendSMSGet() throws IOException, InterruptedException, URISyntaxException {
         HttpRequest request = buildRequest(HttpMethod.GET, buildUrl(null));
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        saveSendSMSData(response.body());
+        saveSMSData(response.body());
         return response.body();
     }
 
@@ -89,24 +85,24 @@ public class SMSServiceImpl implements SMSService {
 
         HttpRequest request = buildRequest(HttpMethod.POST, SMS_API_URL, body.toString());
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        saveSendSMSData(response.body());
+        saveSMSData(response.body());
         return response.body();
     }
 
     @Scheduled(cron = "#{scheduleConfig.getSchedule()}")
     public void scheduleGetMessageStatus() {
-        if (counter < scheduleConfig.getMaxRuns()) {
+        List<SMSEntity> smsCheckList = smsRepository.findByCheckCountLessThan((short) scheduleConfig.getMaxRuns());
+        smsCheckList.forEach(smsEntity -> {
             try {
-                getMessageStatus(stringToUUID("23fabad8-2a16-4699-8847-17f9a9642c53"));
-                counter++;
+                updateMessageStatus(smsEntity);
             } catch (IOException | InterruptedException | URISyntaxException e) {
-                e.printStackTrace();
+                log.error("Error updating message status", e);
             }
-        }
+        });
     }
 
     @Override
-    public String getMessageStatus(UUID messageId) throws IOException, InterruptedException, URISyntaxException {
+    public String checkMessageStatus(UUID messageId) throws IOException, InterruptedException, URISyntaxException {
         String url = UriComponentsBuilder.fromHttpUrl(GET_MSG_STATUS_URL)
                 .queryParam("ApiKey", API_KEY)
                 .queryParam("ClientId", CLIENT_ID)
@@ -115,8 +111,19 @@ public class SMSServiceImpl implements SMSService {
 
         HttpRequest request = buildRequest(HttpMethod.GET, url);
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        saveCheckSMSData(response.body());
         return response.body();
+    }
+
+    public void updateMessageStatus(SMSEntity smsEntity) throws IOException, InterruptedException, URISyntaxException {
+        String url = UriComponentsBuilder.fromHttpUrl(GET_MSG_STATUS_URL)
+                .queryParam("ApiKey", API_KEY)
+                .queryParam("ClientId", CLIENT_ID)
+                .queryParam("MessageId", smsEntity.getMessageId())
+                .toUriString();
+
+        HttpRequest request = buildRequest(HttpMethod.GET, url);
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        updateMessageStatus(smsEntity, response.body());
     }
 
     private HttpRequest buildRequest(HttpMethod method, String url) throws URISyntaxException {
@@ -142,38 +149,42 @@ public class SMSServiceImpl implements SMSService {
         return "Basic " + Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
     }
 
-    private void saveSendSMSData(String responseBody) throws IOException {
+    private void saveSMSData(String responseBody) throws IOException {
         SendSMSDTO sendSMSDTO = objectMapper.readValue(responseBody, SendSMSDTO.class);
         for (SendSMSDTO.DataDTO dataDTO : sendSMSDTO.getData()) {
-            SendSMSEntity sendSMSEntity = new SendSMSEntity();
-            sendSMSEntity.setErrorCode(sendSMSDTO.getErrorCode());
-            sendSMSEntity.setErrorDescription(sendSMSDTO.getErrorDescription());
-            sendSMSEntity.setMessageErrorCode(dataDTO.getMessageErrorCode());
-            sendSMSEntity.setMessageErrorDescription(dataDTO.getMessageErrorDescription());
-            sendSMSEntity.setMobileNumber(dataDTO.getMobileNumber());
-            sendSMSEntity.setMessageId(dataDTO.getMessageId());
-            sendSMSEntity.setCustom(dataDTO.getCustom());
-            sendSMSRepository.save(sendSMSEntity);
+            SMSEntity smsEntity = new SMSEntity();
+            smsEntity.setErrorCode(sendSMSDTO.getErrorCode());
+            smsEntity.setErrorDescription(sendSMSDTO.getErrorDescription());
+            smsEntity.setMessageErrorCode(dataDTO.getMessageErrorCode());
+            smsEntity.setMessageErrorDescription(dataDTO.getMessageErrorDescription());
+            smsEntity.setMobileNumber(dataDTO.getMobileNumber());
+            smsEntity.setMessageId(dataDTO.getMessageId());
+            smsEntity.setCustom(dataDTO.getCustom());
+            smsEntity.setCheckCount((short) 0);
+            smsRepository.save(smsEntity);
         }
     }
 
-    private void saveCheckSMSData(String responseBody) throws IOException {
+    private void updateMessageStatus(SMSEntity smsEntity, String responseBody) throws IOException {
         CheckSMSDTO checkSMSDTO = objectMapper.readValue(responseBody, CheckSMSDTO.class);
-        CheckSMSEntity checkSMSEntity = new CheckSMSEntity();
-        checkSMSEntity.setErrorCode(checkSMSDTO.getErrorCode());
-        checkSMSEntity.setErrorDescription(checkSMSDTO.getErrorDescription());
-        checkSMSEntity.setMobileNumber(checkSMSDTO.getData().getMobileNumber());
-        checkSMSEntity.setSenderId(checkSMSDTO.getData().getSenderId());
-        checkSMSEntity.setMessage(checkSMSDTO.getData().getMessage());
-        checkSMSEntity.setSubmitDate(stringToLocalDateTime(checkSMSDTO.getData().getSubmitDate()));
-        checkSMSEntity.setDoneDate(stringToLocalDateTime(checkSMSDTO.getData().getDoneDate()));
-        checkSMSEntity.setMessageId(stringToUUID(checkSMSDTO.getData().getMessageId()));
-        checkSMSEntity.setStatus(checkSMSDTO.getData().getStatus());
-        checkSMSEntity.setErrorCodeMsg(checkSMSDTO.getData().getErrorCode());
-        checkSMSRepository.save(checkSMSEntity);
+        smsEntity.setErrorCode(checkSMSDTO.getErrorCode());
+        smsEntity.setErrorDescription(checkSMSDTO.getErrorDescription());
+        smsEntity.setMobileNumber(checkSMSDTO.getData().getMobileNumber());
+        smsEntity.setSenderId(checkSMSDTO.getData().getSenderId());
+        smsEntity.setMessage(checkSMSDTO.getData().getMessage());
+        smsEntity.setSubmitDate(stringToLocalDateTime(checkSMSDTO.getData().getSubmitDate()));
+        smsEntity.setDoneDate(stringToLocalDateTime(checkSMSDTO.getData().getDoneDate()));
+        smsEntity.setStatus(checkSMSDTO.getData().getStatus());
+        smsEntity.setErrorCodeMsg(checkSMSDTO.getData().getErrorCode());
+
+        // Increment checkCount
+        short currentCheckCount = (smsEntity.getCheckCount() != null) ? smsEntity.getCheckCount() : 0;
+        smsEntity.setCheckCount((short) (currentCheckCount + 1));
+
+        smsRepository.save(smsEntity);
     }
 
-    private String buildUrl(String queryParams) throws URISyntaxException {
+    private String buildUrl(String queryParams) {
         UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromHttpUrl(SMS_API_URL)
                 .queryParam("ApiKey", API_KEY)
                 .queryParam("ClientId", CLIENT_ID)
@@ -199,12 +210,4 @@ public class SMSServiceImpl implements SMSService {
         }
     }
 
-    private UUID stringToUUID(String uuidStr) {
-        try {
-            return UUID.fromString(uuidStr);
-        } catch (IllegalArgumentException e) {
-            // Handle parsing exception
-            throw new IllegalArgumentException("Invalid UUID format: " + uuidStr, e);
-        }
-    }
 }

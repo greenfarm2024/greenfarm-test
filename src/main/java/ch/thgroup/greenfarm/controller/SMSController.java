@@ -1,6 +1,7 @@
 package ch.thgroup.greenfarm.controller;
 
 import ch.thgroup.greenfarm.service.SMSService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -9,6 +10,7 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.UUID;
 
+@Slf4j
 @RestController
 @RequestMapping("/sms")
 public class SMSController {
@@ -21,32 +23,35 @@ public class SMSController {
     }
 
     @GetMapping("/send-sms-get")
-    public String sendSMSGet() {
+    public ResponseEntity<String> sendSMSGet() {
         try {
-            return smsService.sendSMSGet();
+            String response = smsService.sendSMSGet();
+            return ResponseEntity.ok(response);
         } catch (IOException | InterruptedException | URISyntaxException e) {
-            e.printStackTrace();
-            return "Failed to send SMS via GET";
+            log.error("Failed to send SMS via GET", e);
+            return ResponseEntity.status(500).body("Failed to send SMS via GET");
         }
     }
 
     @PostMapping("/send-sms-post")
-    public String sendSMSPost() {
+    public ResponseEntity<String> sendSMSPost() {
         try {
-            return smsService.sendSMSPost();
+            String response = smsService.sendSMSPost();
+            return ResponseEntity.ok(response);
         } catch (IOException | InterruptedException | URISyntaxException e) {
-            e.printStackTrace();
-            return "Failed to send SMS via POST";
+            log.error("Failed to send SMS via POST", e);
+            return ResponseEntity.status(500).body("Failed to send SMS via POST");
         }
     }
 
     @GetMapping("/status")
     public ResponseEntity<String> getMessageStatus(@RequestParam UUID messageId) {
         try {
-            String response = smsService.getMessageStatus(messageId);
+            String response = smsService.checkMessageStatus(messageId);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            return ResponseEntity.status(500).body(e.getMessage());
+            log.error("Failed to get message status for messageId: {}", messageId, e);
+            return ResponseEntity.status(500).body("Failed to get message status");
         }
     }
 }

@@ -7,5 +7,5 @@ import java.util.UUID;
 public interface SMSService {
     String sendSMSGet() throws IOException, InterruptedException, URISyntaxException;
     String sendSMSPost() throws IOException, InterruptedException, URISyntaxException;
-    String getMessageStatus(UUID messageId) throws IOException, InterruptedException, URISyntaxException;
+    String checkMessageStatus(UUID messageId) throws IOException, InterruptedException, URISyntaxException;
 }

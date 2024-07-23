@@ -3,8 +3,6 @@ package ch.thgroup.greenfarm.service;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
-import java.net.URISyntaxException;
 import java.util.UUID;
 
 @Service
@@ -52,7 +50,7 @@ public class MockSMSServiceImpl implements SMSService {
     }
 
     @Override
-    public String getMessageStatus(UUID messageId) throws IOException, InterruptedException, URISyntaxException {
+    public String checkMessageStatus(UUID messageId) {
         return """
     {
         "ErrorCode": 0,
